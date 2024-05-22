@@ -38,7 +38,7 @@ static XTft TftInstance;     //实例化tft
 XTft_Config* TftConfigPtr;
 int EATED_COUNT = 0;
 int ledth = 0;
-const int HEIGHT = 40;
+const int LENGTH = 40;
 void scan();
 const int WIDTH = 30;
 int IniLenth = 5;
@@ -80,15 +80,15 @@ void inimap() {//已经加上去
 	scan();
 	for (ULONG i = 0; i < 100000 ; i++);
 	//初始化墙壁和空格
-	for (int i = 0; i < HEIGHT; i++) {
+	for (int i = 0; i < LENGTH; i++) {
 		for (int j = 0; j < WIDTH; j++) {
 			map[i][0] = WALL;
 			map[i][WIDTH - 1] = WALL;
 			map[0][j] = WALL;
-			map[HEIGHT - 1][j] = WALL;
+			map[LENGTH - 1][j] = WALL;
 		}
 	}
-	for (int i = 1; i < HEIGHT-1; i++) {
+	for (int i = 1; i < LENGTH-1; i++) {
 		for (int j = 1; j < WIDTH-1; j++) {
 			map[i][j] = SPACE;
 		}
@@ -101,26 +101,26 @@ void inimap() {//已经加上去
 		IniLenth = sw+1;
 	}
     //初始化蛇
-	map[HEIGHT / 2][WIDTH / 2] = 1;       //设置蛇头位置的标志位
+	map[LENGTH / 2][WIDTH / 2] = 1;       //设置蛇头位置的标志位
 	for (int k = 1; k < IniLenth; k++) {
-		map[HEIGHT / 2][WIDTH / 2 - k] = k + 1;       //设置蛇尾位置的标志位
+		map[LENGTH / 2][WIDTH / 2 - k] = k + 1;       //设置蛇尾位置的标志位
 	}
 }
 
-void makefood() {
+void makefood() {//不需要
 	int Food_x, Food_y;     //设计食物的元素值为-2
 	srand(EATED_COUNT++);  //设计随机数食物
-	Food_x = rand() % (HEIGHT - 4) + 2;     //生成食物随机出现的位置坐标
+	Food_x = rand() % (LENGTH - 4) + 2;     //生成食物随机出现的位置坐标
 	Food_y = rand() % (WIDTH - 4) + 2;
 	if (map[Food_x][Food_y] >= 2){          //防止食物出现在蛇身上
-		Food_x = rand() % (HEIGHT - 4) + 2;
+		Food_x = rand() % (LENGTH - 4) + 2;
 		Food_y = rand() % (WIDTH - 4) + 2;
 	}
 	map[Food_x][Food_y] = FOOD;      //设置食物的标志位为-2
 }
 
-void makeboom() {
-	for (int i = 1; i < HEIGHT - 1; i++){          //
+void makeboom() {//不需要
+	for (int i = 1; i < LENGTH - 1; i++){          //
 		for (int j = 1; j < WIDTH - 1; j++){
 			if (map[i][j] ==BOOM)
 			map[i][j]=0;
@@ -128,10 +128,10 @@ void makeboom() {
 	}
     int Boom_x, Boom_y;     //设计炸弹的元素值为-2
     srand(EATED_COUNT++);  //设计随机数炸弹
-    Boom_x = rand() % (HEIGHT - 4) + 2;     //生成炸弹随机出现的位置坐标
+    Boom_x = rand() % (LENGTH - 4) + 2;     //生成炸弹随机出现的位置坐标
     Boom_y = rand() % (WIDTH - 4) + 2;
     while (map[Boom_x][Boom_y] >= 2||map[Boom_x][Boom_y]==FOOD){        //防止炸弹出现在蛇身上或与食物重合
-        Boom_x = rand() % (HEIGHT - 4) + 2;
+        Boom_x = rand() % (LENGTH - 4) + 2;
         Boom_y = rand() % (WIDTH - 4) + 2;
     }
     map[Boom_x][Boom_y] = BOOM;      //设置炸弹的标志位为-2
@@ -145,7 +145,7 @@ void scan() {//已经加上去
 	}
 	begin=1;
 	int i, j;
-	for (i = 0; i < HEIGHT; i++) {
+	for (i = 0; i < LENGTH; i++) {
 		for (j = 0; j < WIDTH; j++) {
 			if (map[i][j] == WALL) XTft_FillScreen(&TftInstance, i * ADD_NUM, j * ADD_NUM, (i + 1) * ADD_NUM - 1, (j + 1) * ADD_NUM - 1, WALL_COLOR);            //输出墙壁
 			else if (map[i][j] == FOOD)  XTft_FillScreen(&TftInstance, i * ADD_NUM, j * ADD_NUM, (i + 1) * ADD_NUM - 1, (j + 1) * ADD_NUM - 1, FOOD_COLOR);      //输出食物
@@ -160,13 +160,13 @@ void move() {
 	int i, j;
 	int oldtail_x, oldtail_y;
 	int oldhead_x, oldhead_y, newhead_x, newhead_y;
-	for (i = 1; i < HEIGHT - 1; i++){            //扫描所有数组，把所有>0的元素+1
+	for (i = 1; i < LENGTH - 1; i++){            //扫描所有数组，把所有>0的元素+1
 		for (j = 1; j < WIDTH - 1; j++){
 			if (map[i][j] > 0)    map[i][j]++;   //扫描到坐标上的数，意思是使贪吃蛇运动起来，其他物体不变
 		}
 	}
 	//数组内的元素值为IniLenth+1时，置0，元素值为2的坐标定义为旧蛇头的位置
-	for (i = 1; i < HEIGHT - 1; i++) {
+	for (i = 1; i < LENGTH - 1; i++) {
 		for (j = 1; j < WIDTH - 1; j++) {        //i代表的是y，j代表的是x
 			if (map[i][j] == IniLenth + 1 + ledth) {
 				oldtail_x = i;

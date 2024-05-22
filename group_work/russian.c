@@ -63,7 +63,7 @@ void chageShape();       //改变形状
 void moveLeft();             //左移
 void moveRight();          //右移
 void clearLines();           //清除已满行
- 
+
 int main()
 {
     system(STTY_US TTY_PATH);  //输入阻塞
