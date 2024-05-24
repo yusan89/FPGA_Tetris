@@ -51,7 +51,7 @@ int TIME_PAUSE = 50000;
 int score=0;//得分
 int check=1;//用于判断游戏是否结束
 char speed_down=1;//速度因子
-char speed_max=2;//速度等级
+char speed_max=3;//速度等级
 
 int a=2;//随机种子
 
@@ -118,6 +118,7 @@ void Button_Handler();    //按键的中断控制函数
 void GameOver_Show();//展示结束界面
 void TimerCounterHandler() ;
 void scan();
+void makescore_ing();//ing显示得分
 int button_status;        //按键状态
 int sw_status;           //开关状态
 int x,y;                 //当前下落图形的坐标
@@ -158,6 +159,7 @@ void inimap() {
 	}
 	scan();
 	create_square();
+	makescore_ing();
 }
 
 void create_square(){
@@ -313,37 +315,37 @@ void move_right(){
 	}
 }
 
-//void speed(){
-//	for (int i = 0; i < 4; i++) {
-//	        if(map[x + shapes[shapeIndex][i].shape_x + 1][y + shapes[shapeIndex][i].shape_y ] == WALL
-//	        || map[x + shapes[shapeIndex][i].shape_x + 1][y + shapes[shapeIndex][i].shape_y ] == fixed_square) {
-//	            return;
-//	        }
-//	    }
-//	Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TLR_OFFSET,(RESET_VALUE+2)/speed_down-2);
-//}
+void speed(){
+	for (int i = 0; i < 4; i++) {
+	        if(map[x + shapes[shapeIndex][i].shape_x + 1][y + shapes[shapeIndex][i].shape_y ] == WALL
+	        || map[x + shapes[shapeIndex][i].shape_x + 1][y + shapes[shapeIndex][i].shape_y ] == fixed_square) {
+	            return;
+	        }
+	    }
+	Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TLR_OFFSET,(RESET_VALUE+2)/speed_down-2);
+}
 void clearLines(){
 	int i, j;
-    //int completed_lines = 0; // 记录已完成的行数
-	for (j = WIDTH-2; j >=1; j--)
+	for (j = WIDTH-1; j >=1; j--)
 	{
         int line_completed = 1; // 行是否已完成标志位，初始为已完成
-		for (i = 1; i < HEIGHT_1-1; i++)
+		for (i = 1; i < HEIGHT_1; i++)
 		{
 			if(map[i][j] != fixed_square)
-                line_completed = 0; // 只要有一个方块不是固定方块，表示该行未完成
-            	//break;
+			{ line_completed = 0; // 只要有一个方块不是固定方块，表示该行未完成
+            	break;
+			}
 		}
 
-	        if (line_completed) { // 如果行已完成
+	        if (line_completed ) { // 如果行已完成
 	            score++; // 已完成行数加一
-	                for (int m = 1; m < HEIGHT_1 - 1; m++)
+	                for (int m = 1; m < HEIGHT_1; m++)
 	                {
 	           		 map[m][j] = SPACE;
 	                }
 	            // 将上方的所有行往下移动一行
 	            for (int k = j; k > 1; k--) {
-	                for (int n = 1; n < HEIGHT_1- 1; n++) {
+	                for (int n = 1; n < HEIGHT_1; n++) {
 	                    map[n][k] = map[n][k-1];
 	                }
 	            }
@@ -397,6 +399,21 @@ void makescore()
 	segcode[1]=0xc1;
 	segcode[2]=segtable[14];
 	segcode[3]=segtable[10];    //七段数码管显示over字样及所得分数
+}
+
+void makescore_ing()
+{
+	int i, j;
+	int temp;
+	int first_num,second_num;
+	first_num=(score)%10;
+	temp=(score)/10;
+	second_num=temp%10;
+	segcode[7]=segtable[first_num];
+	segcode[6]=segtable[second_num];
+     segcode[0]=segtable[1];
+	segcode[1]=0xc8;
+	segcode[2]=0x90;    //七段数码管显示over字样及所得分数
 }
 
 //void showscore(){
@@ -511,6 +528,16 @@ int main()
 	//Xil_Out16( XPAR_GPIO_1_BASEADDR + XGPIO_DATA_OFFSET, 0xffff);
 	XTft_ClearScreen(&TftInstance);
 	inimap();
+	int i,j;
+    while(1){
+	  Xil_Out16( XPAR_GPIO_1_BASEADDR+XGPIO_DATA_OFFSET,poscode[pos]);
+	  Xil_Out16( XPAR_GPIO_1_BASEADDR+XGPIO_DATA2_OFFSET,segcode[pos]);
+	  for( i=0;i<1000;i++)
+		  	 j=i;
+	   pos++;
+	  if(pos==8)
+	     pos=0;
+	}
 	return 0;
 }
 
@@ -538,8 +565,6 @@ void TimerCounterHandler()
 			 }
 		else state=1;
 	}
-	for (int i = 0;i <4;i++)
-			map[x + shapes[shapeIndex][i].shape_x][y  + shapes[shapeIndex][i].shape_y] =fixed_square;
 
     if(state)
    {
@@ -553,6 +578,8 @@ void TimerCounterHandler()
    }
 	  else
 	  {
+		for (int i = 0;i <4;i++)
+				map[x + shapes[shapeIndex][i].shape_x][y  + shapes[shapeIndex][i].shape_y] =fixed_square;
 		  clearLines();
 		  checkover();
 		  if(check){
@@ -576,11 +603,11 @@ void Button_Handler(){
 		chageShape();
 		scan();
 		}
-//	if ((button_status == Btn_DOWN))
-//	{
-//		    //speed();
-//			scan();
-//			}
+	if ((button_status == Btn_DOWN))
+	{
+		    speed();
+			scan();
+			}
 
 	if (button_status == Btn_LEFT)
 		{
