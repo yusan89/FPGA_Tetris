@@ -42,7 +42,6 @@ int shapeIndex=3, shapeIndex_next;//方块索引，取值为1-19
 
 static XTft TftInstance;     //实例化tft
 XTft_Config* TftConfigPtr;
-int EATED_COUNT = 0;
 int ledth = 0;
 const int HEIGHT_1 = 20;
 const int HEIGHT_2 = 30;
@@ -50,6 +49,7 @@ const int WIDTH = 20;
 int TIME_PAUSE = 50000;
 //int SPEED_UP = 800000;
 int score=0;//得分
+int check=1;//用于判断游戏是否结束
 char speed_down=1;//速度因子
 char speed_max=2;//速度等级
 
@@ -122,10 +122,13 @@ void showscore();
 int button_status;        //按键状态
 int sw_status;           //开关状态
 int x,y;                 //当前下落图形的坐标
-int x_next=25,y_next=4;       //
+int x_next=24,y_next=4;       //
 int num=0;                 //方块索引
 void create_square();//生成方块
 void clearLines(); //清除整行
+void checkover();//判断游戏是否结束
+void show_gameover();//展示结束界面
+void makescore();//结束界面展示得分
 
 void inimap() {
 	//打印name
@@ -156,13 +159,7 @@ void inimap() {
 		map[i][7]=WALL;
 	}
 	scan();
-
-	//int i, j;
-		//for (i = 0; i < HEIGHT_2; i++)
-			//for (j = 0; j < WIDTH; j++)
-				//lastmap[i][j] == map[i][j];
-
-		create_square();
+	create_square();
 }
 
 void create_square(){
@@ -181,12 +178,12 @@ void create_square(){
 		}
 	}
 	shapeIndex_next = (rand() % 19) + 1;
-	x=13,y=10;
-		for (int i = 0;i <4;i++){
-			map[x + shapes[shapeIndex][i].shape_x][y + shapes[shapeIndex][i].shape_y] = move_square;
-			map[x_next + shapes[shapeIndex_next][i].shape_x][y_next + shapes[shapeIndex_next][i].shape_y] = fixed_square;
-
-		}
+	x=9,y=2;
+	for (int i = 0;i <4;i++){
+		map[x + shapes[shapeIndex][i].shape_x][y + shapes[shapeIndex][i].shape_y] = move_square;
+		map[x_next + shapes[shapeIndex_next][i].shape_x][y_next + shapes[shapeIndex_next][i].shape_y] = fixed_square;
+	}
+	//增加判断是否直接生成在fixed_square上置check=0
 }
 
 
@@ -257,25 +254,21 @@ void chageShape()//图形变换
 		break;
 	}
 	//ts是假设变形后的图形值
-	int i;
 	//判断假设的图形是否发生碰撞
-	for(i = 0;i < 4;i++) {
+	for(int i = 0;i < 4;i++) {
 		int cx = x+shapes[ts][i].shape_x;
 		int cy = y+shapes[ts][i].shape_y;
-		if (map[cx][cy]==fixed_square||WALL) {
+		if (cx < 1 || cx > HEIGHT_1-2  || cy > WIDTH-2 || map[cx][cy] == fixed_square || map[cx][cy] == WALL) {
 			return;
 		}
-		else {
-			        for (int i = 0;i <4;i++){
-			        	int cx = x+shapes[shapeIndex][i].shape_x;
-			        			int cy = y+shapes[shapeIndex][i].shape_y;
-			        			map[cx][cy] = SPACE;
-			        			map[x+shapes[ts][i].shape_x][y+shapes[ts][i].shape_y]= move_square;
-			        	//map[x + shapes[shapeIndex][i].shape_x][y + shapes[shapeIndex][i].shape_y] = SPACE;
-		            }
-			 }
-	shapeIndex = ts; //完成变形
 	}
+	for(int i=0;i<4;i++){
+		map[x+shapes[shapeIndex][i].shape_x][y+shapes[shapeIndex][i].shape_y]= SPACE;
+	}
+	for(int i=0;i<4;i++){
+			map[x+shapes[ts][i].shape_x][y+shapes[ts][i].shape_y]= move_square;
+		}
+	shapeIndex = ts;
 }
 
 void move_left(){
@@ -333,7 +326,7 @@ void move_right(){
 //}
 void clearLines(){
 	int i, j;
-    int completed_lines = 0; // 记录已完成的行数
+    //int completed_lines = 0; // 记录已完成的行数
 	for (j = WIDTH-2; j >=1; j--)
 	{
         int line_completed = 1; // 行是否已完成标志位，初始为已完成
@@ -360,6 +353,53 @@ void clearLines(){
 	    }
 }
 
+void checkover(){//判断游戏是否结束
+	for(int j=1;j>=0;j--){
+		for(int i=1;i<HEIGHT_1 - 1;i++){
+			if(map[i][j] == fixed_square){
+				check=0;
+				return;
+			}
+		}
+	}
+	check=1;
+	return;
+}
+
+void GameOver_Show()
+{
+	int i, j;
+	for (j = 120; j < 300; j++){
+		for (i = 220; i < 460; i++){
+			XTft_SetPixel(&TftInstance, i, j, gImage_gameover[(j - 120) * 240 + i - 220]);
+		}
+	}
+    makescore();
+    while(1){
+	  Xil_Out16( XPAR_GPIO_1_BASEADDR+XGPIO_DATA_OFFSET,poscode[pos]);
+	  Xil_Out16( XPAR_GPIO_1_BASEADDR+XGPIO_DATA2_OFFSET,segcode[pos]);
+	  for(int i=0;i<1000;i++)
+		  	 j=i;
+	   pos++;
+	  if(pos==8)
+	     pos=0;
+	}
+}
+
+void makescore()
+{
+	int temp;
+	int first_num,second_num;
+	first_num=(score)%10;
+	temp=(score)/10;
+	second_num=temp%10;
+	segcode[7]=segtable[first_num];
+	segcode[6]=segtable[second_num];
+     segcode[0]=segtable[0];
+	segcode[1]=0xc1;
+	segcode[2]=segtable[14];
+	segcode[3]=segtable[10];    //七段数码管显示over字样及所得分数
+}
 
 //void showscore(){
 //	int score_len = score_length[score];
@@ -429,6 +469,7 @@ void clearLines(){
 //			break;
 //		}
 //}
+
 int main()
 {
 	//中断初始化
@@ -440,6 +481,9 @@ int main()
     Xil_Out32(XPAR_AXI_INTC_0_BASEADDR+XIN_IER_OFFSET,0x3);//使能GPIO和Timer中断
     Xil_Out32(XPAR_AXI_INTC_0_BASEADDR+XIN_MER_OFFSET,0x3);//使能中断输出
 
+    Xil_Out32(XPAR_AXI_GPIO_1_BASEADDR+XGPIO_TRI_OFFSET,0x00);
+	Xil_Out32(XPAR_AXI_GPIO_1_BASEADDR+XGPIO_TRI2_OFFSET,0x00);
+
 	//Xil_Out32(XPAR_AXI_GPIO_0_BASEADDR + XGPIO_TRI_OFFSET, 0Xffff);//设定开关为输入方式
 	//Xil_Out32(XPAR_AXI_GPIO_0_BASEADDR + XGPIO_TRI_OFFSET, 0X1f);//设定BUTTON为输入方式
 	//Xil_Out32(XPAR_AXI_GPIO_0_BASEADDR + XGPIO_IER_OFFSET, XGPIO_IR_CH1_MASK);//通道1允许中断
@@ -449,18 +493,18 @@ int main()
     //Xil_Out32(XPAR_AXI_GPIO_1_BASEADDR+XGPIO_TRI_OFFSET,0x00);
 	//Xil_Out32(XPAR_AXI_GPIO_1_BASEADDR+XGPIO_TRI2_OFFSET,0x00);
 
-	 Xil_Out32(XPAR_AXI_GPIO_0_BASEADDR+XGPIO_TRI2_OFFSET,0x0);
-	    Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET,
+	Xil_Out32(XPAR_AXI_GPIO_0_BASEADDR+XGPIO_TRI2_OFFSET,0x0);
+	Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET,
 	    		Xil_In32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET)&~XTC_CSR_ENABLE_TMR_MASK);
-	    Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TLR_OFFSET,RESET_VALUE);
-	    Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET,
-	    		Xil_In32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET)|XTC_CSR_LOAD_MASK);
-	    Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET,
-	    		(Xil_In32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET)&~XTC_CSR_LOAD_MASK)\
-				|XTC_CSR_ENABLE_TMR_MASK|XTC_CSR_AUTO_RELOAD_MASK|XTC_CSR_ENABLE_INT_MASK|XTC_CSR_DOWN_COUNT_MASK);
+	Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TLR_OFFSET,RESET_VALUE);
+	Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET,
+	    	Xil_In32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET)|XTC_CSR_LOAD_MASK);
+	Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET,
+	    	(Xil_In32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET)&~XTC_CSR_LOAD_MASK)\
+			|XTC_CSR_ENABLE_TMR_MASK|XTC_CSR_AUTO_RELOAD_MASK|XTC_CSR_ENABLE_INT_MASK|XTC_CSR_DOWN_COUNT_MASK);
 
-	    //Xil_Out32(XPAR_AXI_INTC_0_BASEADDR+XIN_IER_OFFSET,XPAR_AXI_TIMER_0_INTERRUPT_MASK);
-	   // Xil_Out32(XPAR_AXI_INTC_0_BASEADDR+XIN_MER_OFFSET,XIN_INT_MASTER_ENABLE_MASK|XIN_INT_HARDWARE_ENABLE_MASK);
+	//Xil_Out32(XPAR_AXI_INTC_0_BASEADDR+XIN_IER_OFFSET,XPAR_AXI_TIMER_0_INTERRUPT_MASK);
+	// Xil_Out32(XPAR_AXI_INTC_0_BASEADDR+XIN_MER_OFFSET,XIN_INT_MASTER_ENABLE_MASK|XIN_INT_HARDWARE_ENABLE_MASK);
 
 	TftConfigPtr = XTft_LookupConfig(TFT_DEVICE_ID);
 	XTft_CfgInitialize(&TftInstance, TftConfigPtr, TftConfigPtr->BaseAddress); //初始化tft
@@ -471,6 +515,7 @@ int main()
 	inimap();
 	return 0;
 }
+
 void My_ISR()
 {
 	  int status;
@@ -511,7 +556,15 @@ void TimerCounterHandler()
 	  else
 	  {
 		  clearLines();
-		  create_square();
+		  checkover();
+		  if(check){
+			create_square();
+		  }
+		  else{
+			scan();
+			GameOver_Show();
+		  }
+
 	  }
 scan();
 Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET,Xil_In32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET));
