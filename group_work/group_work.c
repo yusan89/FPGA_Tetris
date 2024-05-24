@@ -14,7 +14,7 @@
 //#define SCREEN_LENGTH 20   //游戏屏幕长度
 #define START_X 0         //屏幕起始x坐标
 #define START_Y 0          //屏幕起始y坐标
-#define ADD_NUM 16          //游戏画面和显示屏幕大小比，即为蛇身一块的大小（16*16）
+#define ADD_NUM 16          //像素块大小
 
 //#define TIMER_BASEADDR 0x41C00000
 //基地址的宏定义
@@ -53,7 +53,7 @@ int check=1;//用于判断游戏是否结束
 char speed_down=1;//速度因子
 char speed_max=2;//速度等级
 
-int a=2;
+int a=2;//随机种子
 
 enum thing
 {
@@ -115,10 +115,9 @@ enum direc{ left, right, up, down };
 int movedirection = right;       //蛇头方向
 void My_ISR()__attribute__((interrupt_handler));
 void Button_Handler();    //按键的中断控制函数
-void GameOver_Show();
+void GameOver_Show();//展示结束界面
 void TimerCounterHandler() ;
 void scan();
-void showscore();
 int button_status;        //按键状态
 int sw_status;           //开关状态
 int x,y;                 //当前下落图形的坐标
@@ -127,7 +126,6 @@ int num=0;                 //方块索引
 void create_square();//生成方块
 void clearLines(); //清除整行
 void checkover();//判断游戏是否结束
-void show_gameover();//展示结束界面
 void makescore();//结束界面展示得分
 
 void inimap() {
