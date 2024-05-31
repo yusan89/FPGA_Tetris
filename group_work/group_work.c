@@ -125,9 +125,67 @@ int x,y;                 //当前下落图形的坐标
 int x_next=24,y_next=4;       //
 int num=0;                 //方块索引
 void create_square();//生成方块
+void clear_single_line(int row);//消去单独的一行，传入行号
 void clearLines(); //清除整行
 void checkover();//判断游戏是否结束
 void makescore();//结束界面展示得分
+
+#define MAX_SIZE 5 // 栈的最大容量
+// 定义栈的结构体
+typedef struct {
+    int top;      // 栈顶索引
+    int array[MAX_SIZE];   // 存储栈元素的数组
+} Stack;
+
+// 创建一个新栈
+Stack* createStack() {
+    Stack* stack = (Stack*)malloc(sizeof(Stack));
+    if (!stack) {
+        printf("内存分配失败\n");
+        return NULL;
+    }
+    stack->top = -1; // 初始化栈顶索引为-1
+    return stack;
+}
+
+// 判断栈是否为空
+int isEmpty(Stack* stack) {
+    return stack->top == -1;
+}
+
+// 判断栈是否已满
+int isFull(Stack* stack) {
+    return stack->top == MAX_SIZE - 1;
+}
+
+// 入栈操作
+void push(Stack* stack, int item) {
+    if (isFull(stack)) {
+        printf("栈已满\n");
+        return;
+    }
+    stack->array[++stack->top] = item;
+    printf("%d 入栈\n", item);
+}
+
+// 出栈操作
+int pop(Stack* stack) {//栈为空，返回1；栈不为空，返回0
+    if (isEmpty(stack)) {
+        printf("栈为空\n");
+        return -1;
+    }
+    printf("%d 出栈\n", stack->array[stack->top]);
+    return stack->array[stack->top--];
+}
+
+// 获取栈顶元素
+int peek(Stack* stack) {
+    if (isEmpty(stack)) {
+        printf("栈为空\n");
+        return -1;
+    }
+    return stack->array[stack->top];
+}
 
 void inimap() {
 	//打印name
@@ -324,33 +382,42 @@ void speed(){
 	    }
 	Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TLR_OFFSET,(RESET_VALUE+2)/speed_down-2);
 }
+
+void clear_single_line(int row){//消去单独的一行，传入行号
+	score++; // 得分加一
+	for (int m = 1; m < HEIGHT_1; m++){
+	     map[m][row] = SPACE;
+	}
+	// 将上方的所有行往下移动一行
+	for (int k = row; k > 1; k--) {
+	    for (int n = 1; n < HEIGHT_1; n++) {
+	                map[n][k] = map[n][k-1];
+	         }
+	    }
+}
+
 void clearLines(){
 	int i, j;
-	for (j = WIDTH-1; j >=1; j--)
-	{
-        int line_completed = 1; // 行是否已完成标志位，初始为已完成
-		for (i = 1; i < HEIGHT_1; i++)
-		{
-			if(map[i][j] != fixed_square)
-			{ line_completed = 0; // 只要有一个方块不是固定方块，表示该行未完成
+	for (j = WIDTH-1; j >=1; j--){
+		for (i = 1; i < HEIGHT_1; i++){
+			if(map[i][j] != fixed_square){ 	
             	break;
 			}
+			if (i = HEIGHT_1 -1)
+			{
+				push(Stack,j);
+			}
 		}
-
-	        if (line_completed ) { // 如果行已完成
-	            score++; // 已完成行数加一
-	                for (int m = 1; m < HEIGHT_1; m++)
-	                {
-	           		 map[m][j] = SPACE;
-	                }
-	            // 将上方的所有行往下移动一行
-	            for (int k = j; k > 1; k--) {
-	                for (int n = 1; n < HEIGHT_1; n++) {
-	                    map[n][k] = map[n][k-1];
-	                }
-	            }
-	        }
-	    }
+	}
+	if (isEmpty(Stack)){
+		return;
+	}else{
+		while (!isEmpty(Stack))
+		{
+			row=pop(Stack);
+			clear_single_line(row);
+		}
+	}
 }
 
 void checkover(){//判断游戏是否结束
@@ -395,7 +462,7 @@ void makescore()
 	second_num=temp%10;
 	segcode[7]=segtable[first_num];
 	segcode[6]=segtable[second_num];
-     segcode[0]=segtable[0];
+    segcode[0]=segtable[0];
 	segcode[1]=0xc1;
 	segcode[2]=segtable[14];
 	segcode[3]=segtable[10];    //七段数码管显示over字样及所得分数
@@ -411,9 +478,9 @@ void makescore_ing()
 	second_num=temp%10;
 	segcode[7]=segtable[first_num];
 	segcode[6]=segtable[second_num];
-     segcode[0]=segtable[1];
+    segcode[0]=segtable[1];
 	segcode[1]=0xc8;
-	segcode[2]=0x90;    //七段数码管显示over字样及所得分数
+	segcode[2]=0x90;    //七段数码管显示ing字样及所得分数
 }
 
 //void showscore(){
@@ -527,6 +594,7 @@ int main()
 	microblaze_enable_interrupts();//允许微处理器接受中断
 	//Xil_Out16( XPAR_GPIO_1_BASEADDR + XGPIO_DATA_OFFSET, 0xffff);
 	XTft_ClearScreen(&TftInstance);
+	Stack* stack = createStack();
 	inimap();
 	int i,j;
     while(1){
