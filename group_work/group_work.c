@@ -20,6 +20,7 @@ void scan();						//扫掠界面-对应方块上色
 void square_Show(int m,int n);		//方块贴图
 void clear_single_line(int row);	//消去单独的一行，传入行号
 void clearLines(); 					//清除整行
+void rand_square();					//初始生成方块
 
 void caculate();					//计算分数位次
 void showscore_first();				//展示个位分数
@@ -30,6 +31,7 @@ void makescore_ing();				//ing 状态显示得分
 void makescore_stop();				//stop状态显示得分
 void makescore();					//结束界面展示得分
 
+void game_begin();					//游戏开始功能
 void checkover();					//判断游戏是否结束
 void GameOver_Show();				//展示结束界面
 
@@ -63,10 +65,13 @@ enum thing
 	NAME,			//游戏名
 	WALL,			//墙壁
 	SPACE,			//空白
+	background_1,
+	background_2,	//背景
     move_square,	//可移动方块
 	fixed_square,	//已固定方块
 	next_square,	//下一个方块
-	display_score	//得分显示
+	display_score,	//得分显示
+	difficulty		//难度
 };
 
 /*-----------------------------方块颜色------------------------------------*/
@@ -76,8 +81,14 @@ enum thing
 #define color_4 0x008ab07d      //R:138 G:176 B:125	色
 #define color_5 0x00e9c46b      //R:233 G:196 B:107	色
 #define color_6 0x00f3a261     	//R:243 G:162 B:097	色
-#define color_score 0x00ff7271		//R:040 G:114 B:113  得分颜色
-#define color_white 0xffffffff      //R:255 G:255 B:255 白色墙壁
+#define color_name 	0x00fca311			//R:252 G:163 B:017  游戏颜色
+#define color_score 0x00ff7271			//R:040 G:114 B:113  得分颜色
+#define color_difficulty 0x00ff0000		//R:255 G:0   B:0	难度颜色
+#define color_background_1 0x00e0e0e0   //R:224 G:224 B:224 背景色
+#define color_background_2 0x0013213c	//R:019 G:033 B:060  背景颜色
+#define color_white 0xffffffff      	//R:255 G:255 B:255  白色墙壁
+#define color_black 0x00000000      	//R:0   G:0   B:0 	黑色背景
+
 
 
 /*-----------------------------方块结构------------------------------------*/
@@ -118,10 +129,16 @@ const int WIDTH_2 = 19;		//游戏区y轴长度
 /*-----------------------------参数定义------------------------------------*/
 int map[30][23];			//创建地图大小
 int map_color[30][23];		//存储不同方块颜色
-int nameMap[][2]={{3,3},{3,4},{3,5},{3,6},{3,7},{1,3},{2,3},{4,3},{5,3},
-				  {7,4},{8,3},{9,4},{9,5},{7,5},{8,5},{7,7},{7,6},{8,7},{9,7},{7,3},{9,3},
-				  {10,4},{11,4},{12,4},{13,4},{14,4},{12,3},{12,5},{12,6},{12,7},{13,7}//tetris
+int nameMap[  ][2]=	{{ 5,4},{ 6,4},{ 7,4},{ 6,5},{ 6,6},{ 6,7},{ 6,8},//T
+				  	{ 9,4},{10,4},{11,4},{ 9,5},{ 9,6},{ 9,7},{ 9,8},{10,6},{10,8},{11,6},{11,8},{12,8},//E
+				    {13,4},{14,4},{15,4},{14,5},{14,6},{14,7},{14,8},//T
+					{17,4},{18,4},{16,5},{16,6},{16,7},{16,8},{17,6},{18,5},{17,6},{18,7},{19,8},//R
+					{20,4},{20,6},{20,7},{20,8},//I
+					{22,4},{23,4},{24,4},{22,5},{22,6},{23,6},{24,6},{24,7},{24,8},{23,8},{23,8},{22,8},{21,8}//S
+//tetris
 };							//显示游戏名
+int squareMap[	][2]={{1,17},{2,16},{3,15},{4,14},{5,13},{6,12},{7,11},{8,10},
+					  {9,9},{10,10},{11,11},{12,12},{13,13},{14,14},{15,15},{16,16},{17,17}};		//生成初始方块
 int X,Y;                 	//生成下落方块的坐标
 int x_next=24,y_next=3;     //后续方块显示位置
 int num=0;                 	//方块索引
@@ -129,6 +146,7 @@ int shapeIndex=3; 			//方块索引，取值为1-19
 int shapeIndex_next;		//后续方块索引，取值为1-19
 
 int button_status;  //按键状态
+int switch_status;  //开关状态
 int score=59;		//初始得分
 int first_num=0;	//得分个位
 int second_num=0;	//得分十位
@@ -136,12 +154,18 @@ int second_num=0;	//得分十位
 char speed_down=1;	//下降速度等级
 char speed_max=3;	//最大速度等级
 
+int difficult=0;	//难度块数
+
 static XTft TftInstance;     //实例化tft
 XTft_Config* TftConfigPtr;
 
 int a=2;				//随机种子生成随机序列
-int begin=1;			//判断游戏是否暂停（1为进行，2为暂停）
-int check=1;			//判断游戏是否结束（1为进行，2为结束）
+int b=7;				//随机种子生成随机序列
+int c=9;				//随机种子生成随机序列
+
+int begin=1;			//判断游戏是否暂停（1为进行，0为暂停）
+int check=1;			//判断游戏是否结束（1为进行，0为结束）
+int start=0;			//判断游戏是否开始（1为开始，0为结束）
 
 /*-----------------------------得分显示------------------------------------*/
 int pos=0;//七段数码管位码
@@ -230,24 +254,36 @@ Stack stack;				//全局栈
 
 /*-----------------------------初始化------------------------------------*/
 
+void game_begin()
+{
+//初始背景
+for (int i = 0; i < HEIGHT_2; i++)
+		for (int j = 0; j < WIDTH_2; j++)
+				map[i][j] = background_1;
+
+for (int i = 4; i < HEIGHT_2-4; i++)
+			for (int j = 3; j < 10; j++)
+					map[i][j] = background_2;
+for (int i = 10; i < HEIGHT_2-10; i++)
+			for (int j = 10; j < 17; j++)
+					map[i][j] = background_2;
+scan();
+
+int a,b=0;
+for (int i=0;i<54;i++){//打印name
+	a=nameMap[i][0];
+	b=nameMap[i][1];
+	map[a][b]=NAME;
+}
+scan();
+//延迟显示游戏名
+Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET,Xil_In32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET)&0xff7f);//计数器暂停
+sleep(5);//等待
+Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET,Xil_In32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET)|0x80);//计数器启动
+}
+
 //初始化地图界面
 void inimap() {
-	for (int i = 0; i < HEIGHT_2; i++)
-			for (int j = 0; j < WIDTH_2; j++)
-					map[i][j] = SPACE;
-	scan();
-	int a,b=0;
-	for (int i=0;i<31;i++){//打印name
-		a=nameMap[i][0];
-		b=nameMap[i][1];
-		map[a][b]=NAME;
-	}
-	scan();
-	//延迟显示游戏名
-	Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET,Xil_In32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET)&0xff7f);//计数器暂停
-	sleep(5);//等待
-	Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET,Xil_In32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET)|0x80);//计数器启动
-
 /*-----------------------------画地图------------------------------------*/
 	//画背景
 	for (int i = 1; i < HEIGHT_2-1; i++) {
@@ -270,6 +306,28 @@ void inimap() {
 		map[i][0]=WALL;
 		map[i][WIDTH_1]=WALL;
 	}
+	switch(switch_status) {
+		case 1:
+			map[21][9] = difficulty;
+			difficult=1;
+			break;
+		case 2:
+			map[21][9] = difficulty;
+			map[24][9] = difficulty;
+			difficult=2;
+			break;
+		case 4:
+			map[21][9] = difficulty;
+			map[24][9] = difficulty;
+			map[27][9] = difficulty;
+			difficult=3;
+			break;
+		default:
+			map[21][9] = difficulty;
+			difficult=1;
+			break;
+	}
+	rand_square(difficult);
 	//为方块染色
 	scan();
 	//生成新方块
@@ -310,18 +368,41 @@ void create_square(){
 	}
 }
 
+void rand_square(int difficult){
+	switch(difficult) {
+			case 1:
+				break;
+			case 2:
+				for(int i=1;i<6;i++)
+					map[i][8] = difficulty;
+				break;
+			case 3:
+				for (int i=0;i<17;i++){//打印初始方块
+					int m=squareMap[i][0];
+					int n=squareMap[i][1];
+					map[m][n]=difficulty;
+				}
+				break;
+			default:
+				break;
+	}
+}
+
 //扫掠染色方块
 void scan() {
 	int i, j;
 	for (i = 0; i < HEIGHT_2; i++) {
 		for (j = 0; j < WIDTH_2; j++) {
 			if (map[i][j] == WALL) square_Show(i,j);
-			if (map[i][j] == NAME) XTft_FillScreen(&TftInstance, i * ADD_NUM, j * ADD_NUM, (i + 1) * ADD_NUM - 1, (j + 1) * ADD_NUM - 1, color_1);     								//输出游戏名
+			if (map[i][j] == NAME) XTft_FillScreen(&TftInstance, i * ADD_NUM, j * ADD_NUM, (i + 1) * ADD_NUM - 1, (j + 1) * ADD_NUM - 1, color_name);     								//输出游戏名
 			if (map[i][j] == SPACE) XTft_FillScreen(&TftInstance, i * ADD_NUM, j * ADD_NUM, (i + 1) * ADD_NUM - 1, (j + 1) * ADD_NUM - 1, color_white);     							//输出空白
-			if (map[i][j] == move_square)   XTft_FillScreen(&TftInstance, i * ADD_NUM, j * ADD_NUM, (i + 1) * ADD_NUM - 1, (j + 1) * ADD_NUM - 1, shapes[shapeIndex][0].color);     	//可移动的方块
+			if (map[i][j] == difficulty) XTft_FillScreen(&TftInstance, i * ADD_NUM, j * ADD_NUM, (i + 1) * ADD_NUM - 1, (j + 1) * ADD_NUM - 1, color_difficulty);     					//输出难度
+			if (map[i][j] == background_1)   XTft_FillScreen(&TftInstance, i * ADD_NUM, j * ADD_NUM, (i + 1) * ADD_NUM - 1, (j + 1) * ADD_NUM - 1, color_background_1);					//输出背景
+			if (map[i][j] == background_2)   XTft_FillScreen(&TftInstance, i * ADD_NUM, j * ADD_NUM, (i + 1) * ADD_NUM - 1, (j + 1) * ADD_NUM - 1, color_background_2);					//输出背景
+			if (map[i][j] == move_square)  	 XTft_FillScreen(&TftInstance, i * ADD_NUM, j * ADD_NUM, (i + 1) * ADD_NUM - 1, (j + 1) * ADD_NUM - 1, shapes[shapeIndex][0].color);     	//可移动的方块
 			if (map[i][j] == fixed_square)   XTft_FillScreen(&TftInstance, i * ADD_NUM, j * ADD_NUM, (i + 1) * ADD_NUM - 1, (j + 1) * ADD_NUM - 1, map_color[i][j]);					//已固定的方块
-			if (map[i][j] == next_square)   XTft_FillScreen(&TftInstance, i * ADD_NUM, j * ADD_NUM, (i + 1) * ADD_NUM - 1, (j + 1) * ADD_NUM - 1, shapes[shapeIndex_next][0].color);	//后续方块
-			if (map[i][j] == display_score)   XTft_FillScreen(&TftInstance, i * ADD_NUM, j * ADD_NUM, (i + 1) * ADD_NUM - 1, (j + 1) * ADD_NUM - 1, color_score);						//输出得分
+			if (map[i][j] == next_square)  	 XTft_FillScreen(&TftInstance, i * ADD_NUM, j * ADD_NUM, (i + 1) * ADD_NUM - 1, (j + 1) * ADD_NUM - 1, shapes[shapeIndex_next][0].color);	//后续方块
+			if (map[i][j] == display_score)  XTft_FillScreen(&TftInstance, i * ADD_NUM, j * ADD_NUM, (i + 1) * ADD_NUM - 1, (j + 1) * ADD_NUM - 1, color_score);						//输出得分
 		}
 	}
 }
@@ -394,7 +475,7 @@ void chageShape()
 	for(int i = 0;i < 4;i++) {
 		int cx = X+shapes[ts][i].shape_x;
 		int cy = Y+shapes[ts][i].shape_y;
-		if (cx < 1 || cx > HEIGHT_1-2  || cy > WIDTH_2-2 || map[cx][cy] == fixed_square || map[cx][cy] == WALL) {
+		if (cx < 1 || cx > HEIGHT_1-2  || cy > WIDTH_2-2 || map[cx][cy] == fixed_square || map[cx][cy] == WALL||map[cx][cy] == difficulty) {
 			return;
 		}
 	}
@@ -411,7 +492,8 @@ void chageShape()
 void move_left(){
 	for (int i = 0; i < 4; i++) {
         if(map[X + shapes[shapeIndex][i].shape_x - 1][Y + shapes[shapeIndex][i].shape_y ] == WALL
-        || map[X + shapes[shapeIndex][i].shape_x - 1][Y + shapes[shapeIndex][i].shape_y ] == fixed_square) {
+        || map[X + shapes[shapeIndex][i].shape_x - 1][Y + shapes[shapeIndex][i].shape_y ] == fixed_square
+		|| map[X + shapes[shapeIndex][i].shape_x - 1][Y + shapes[shapeIndex][i].shape_y ] == difficulty) {
             return;
         }
     }
@@ -434,7 +516,8 @@ void move_left(){
 void move_right(){
 	for (int i = 0; i < 4; i++) {
         if(map[X + shapes[shapeIndex][i].shape_x + 1][Y + shapes[shapeIndex][i].shape_y ] == WALL
-        || map[X + shapes[shapeIndex][i].shape_x + 1][Y + shapes[shapeIndex][i].shape_y ] == fixed_square) {
+        || map[X + shapes[shapeIndex][i].shape_x + 1][Y + shapes[shapeIndex][i].shape_y ] == fixed_square
+		|| map[X + shapes[shapeIndex][i].shape_x + 1][Y + shapes[shapeIndex][i].shape_y ] == difficulty) {
             return;
         }
     }
@@ -476,7 +559,7 @@ void clearLines(){
 	int i, j;
 	for (j = WIDTH_2-1; j >=1; j--){
 		for (i = 1; i < HEIGHT_1; i++){
-			if(map[i][j] != fixed_square){
+			if(map[i][j] != fixed_square && map[i][j] != difficulty){
             	break;
 			}
 			if (i == HEIGHT_1 -1)
@@ -511,7 +594,7 @@ void screen_first(){
 	int i, j;
 		for (i = HEIGHT_1+4; i<HEIGHT_2-1; i++)
 		{
-			for (j = WIDTH_1+1; j < WIDTH_2-1; j++)
+			for (j = WIDTH_1+3; j < WIDTH_2-1; j++)
 			{
 				map[i][j]=SPACE;
 			}
@@ -523,7 +606,7 @@ void screen_second(){
 	int i, j;
 		for (i = HEIGHT_1+1; i<HEIGHT_1+4; i++)
 		{
-			for (j = WIDTH_1+1; j < WIDTH_2-1; j++)
+			for (j = WIDTH_1+3; j < WIDTH_2-1; j++)
 			{
 				map[i][j]=SPACE;
 			}
@@ -801,8 +884,12 @@ int main()
     Xil_Out32(XPAR_AXI_GPIO_0_BASEADDR+XGPIO_TRI_OFFSET,0xffff);//输入方向
     Xil_Out32(XPAR_AXI_GPIO_0_BASEADDR+XGPIO_IER_OFFSET,0x1);//使能1号引脚中断
     Xil_Out32(XPAR_AXI_GPIO_0_BASEADDR+XGPIO_GIE_OFFSET,0x80000000);//使能中断输出
+    //Switch
+    Xil_Out32(XPAR_AXI_GPIO_2_BASEADDR+XGPIO_TRI_OFFSET,0xffff);//输入方向
+    Xil_Out32(XPAR_AXI_GPIO_2_BASEADDR+XGPIO_IER_OFFSET,0x1);//使能1号引脚中断
+    Xil_Out32(XPAR_AXI_GPIO_2_BASEADDR+XGPIO_GIE_OFFSET,0x80000000);//使能中断输出
     //INTC
-    Xil_Out32(XPAR_AXI_INTC_0_BASEADDR+XIN_IER_OFFSET,0x3);//使能GPIO和Timer中断
+    Xil_Out32(XPAR_AXI_INTC_0_BASEADDR+XIN_IER_OFFSET,0xb);//使能GPIO和Timer中断
     Xil_Out32(XPAR_AXI_INTC_0_BASEADDR+XIN_MER_OFFSET,0x3);//使能中断输出
 
     Xil_Out32(XPAR_AXI_GPIO_1_BASEADDR+XGPIO_TRI_OFFSET,0x00);
@@ -825,17 +912,18 @@ int main()
 	XTft_ClearScreen(&TftInstance);
 	clearStack(&stack);
 	caculate();
-	inimap();
-	int i,j=0;
-    while(1){
-	  Xil_Out16( XPAR_GPIO_1_BASEADDR+XGPIO_DATA_OFFSET,poscode[pos]);
-	  Xil_Out16( XPAR_GPIO_1_BASEADDR+XGPIO_DATA2_OFFSET,segcode[pos]);
-	  for( i=0;i<1000;i++)
-		  	 j=i;
-	   pos++;
-	  if(pos==8)
-	     pos=0;
-	}
+	game_begin();
+//	inimap();
+//	int i,j=0;
+//    while(1){
+//	  Xil_Out16( XPAR_GPIO_1_BASEADDR+XGPIO_DATA_OFFSET,poscode[pos]);
+//	  Xil_Out16( XPAR_GPIO_1_BASEADDR+XGPIO_DATA2_OFFSET,segcode[pos]);
+//	  for( i=0;i<1000;i++)
+//		  	 j=i;
+//	   pos++;
+//	  if(pos==8)
+//	     pos=0;
+//	}
 	return 0;
 }
 /*-----------------------------中断处理------------------------------------*/
@@ -853,9 +941,13 @@ void My_ISR()
 //定时器中断处理
 void TimerCounterHandler()
 {
+	if(start)
+	{
 	int state=0;//是否能下降
 	for (int i = 0;i <4;i++){
-		if(map[X + shapes[shapeIndex][i].shape_x][Y + 1 + shapes[shapeIndex][i].shape_y] ==WALL||map[X + shapes[shapeIndex][i].shape_x][Y + 1 + shapes[shapeIndex][i].shape_y] ==fixed_square)
+		if(map[X + shapes[shapeIndex][i].shape_x][Y + 1 + shapes[shapeIndex][i].shape_y] ==WALL
+				||map[X + shapes[shapeIndex][i].shape_x][Y + 1 + shapes[shapeIndex][i].shape_y] ==fixed_square
+				||map[X + shapes[shapeIndex][i].shape_x][Y + 1 + shapes[shapeIndex][i].shape_y] ==difficulty)
 			 {
 			 state=0;
 			 break;
@@ -893,17 +985,29 @@ void TimerCounterHandler()
 	  }
 scan();
 Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET,Xil_In32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET));
+	}
 }
 
 //按键中断处理
 void Button_Handler(){
 	button_status = Xil_In8(XPAR_GPIO_0_BASEADDR + XGPIO_DATA_OFFSET) & 0x1f;  //读取按键的状态值
-	if(button_status==Btn_CENTER){
+	if((button_status==Btn_CENTER)&&(start)){
 		if (begin == 1)
 			begin=0;
 		else if(begin == 0)
 			begin=1;
 		}
+
+	if((!start)&&(button_status==Btn_CENTER))
+	{
+
+		switch_status = Xil_In8(XPAR_GPIO_2_BASEADDR + XGPIO_DATA_OFFSET) & 0x7;
+		if((switch_status==0x1)||(switch_status==0x2)||(switch_status==0x4))
+			{
+			start=1;
+			inimap();
+			}
+	}
 
 	if (begin != 0) {
 	    // 如果 begin 不等于 0，说明需要启动定时器
@@ -919,25 +1023,25 @@ void Button_Handler(){
 		makescore_stop();//暂停并展示得分
 	}
 
-	if (button_status == Btn_UP&&(begin))
+	if (button_status == Btn_UP&&(begin)&&(start))
 		{
 		chageShape();
 		scan();
 		}
-	if((button_status==Btn_DOWN)&&(speed_down<speed_max)&&(begin)){//加速下降
+	if((button_status==Btn_DOWN)&&(speed_down<speed_max)&&(begin)&&(start)){//加速下降
 			speed_down++;
 			Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TLR_OFFSET,(RESET_VALUE+2)/speed_down-2);
 		}
-		else if((button_status==Btn_DOWN)&&(speed_down==speed_max)&&(begin)){
+		else if((button_status==Btn_DOWN)&&(speed_down==speed_max)&&(begin)&&(start)){
 			speed_down=1;
 			Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TLR_OFFSET,(RESET_VALUE+2)/speed_down-2);
 		}
-	if ((button_status == Btn_LEFT)&&(begin))
+	if ((button_status == Btn_LEFT)&&(begin)&&(start))
 		{
 		move_left();
 		scan();
 		}
-	if ((button_status == Btn_RIGHT)&&(begin))
+	if ((button_status == Btn_RIGHT)&&(begin)&&(start))
 		{
 		move_right();
 		scan();
