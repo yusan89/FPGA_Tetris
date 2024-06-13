@@ -1,5 +1,6 @@
 #include "stdlib.h"
 #include <stdio.h>
+#include <unistd.h>
 #include "platform.h"
 #include "xil_printf.h"
 #include "gameover.h"
@@ -12,9 +13,11 @@
 #include "color.h"			//方块贴图的数组矩阵
 /*-----------------------------函数定义------------------------------------*/
 void My_ISR()__attribute__((interrupt_handler));
+void PS2_Handler();    				//键盘的中断控制函数
 void Button_Handler();    			//按键的中断控制函数
 void TimerCounterHandler();			//定时器中断控制函数
 
+void inimap();						//初始化地图
 void create_square();				//生成方块
 void scan();						//扫掠界面-对应方块上色
 void square_Show(int m,int n);		//方块贴图
@@ -47,18 +50,23 @@ int isFull();						//判断栈是否已满
 #define ADD_NUM 18          //像素块大小
 #define TFT_BASEADDR XPAR_AXI_TFT_0_BASEADDR	//基地址的宏定义
 #define TFT_FRAME_BASEADDR XPAR_MIG7SERIES_0_BASEADDR
-#define RESET_VALUE 100000000-2					//定时器周期1s
-
-/*-----------------------------按钮定义------------------------------------*/
 #define TFT_DEVICE_ID XPAR_TFT_0_DEVICE_ID
 #define TFT_FRAME_BASEADDR0 0X86000000
 #define TFT_FRAME_BASEADDR1 0X84000000
+#define RESET_VALUE 100000000-2					//定时器周期1s
+/*-----------------------------按钮定义------------------------------------*/
 #define Btn_UP 0x2
 #define Btn_DOWN 0x10
 #define Btn_LEFT 0x4
 #define Btn_RIGHT 0x8
 #define Btn_CENTER 0x1
 
+/*-----------------------------键盘定义------------------------------------*/
+#define PS2_UP 0x2
+#define PS2_DOWN 0x10
+#define PS2_LEFT 0x4
+#define PS2_RIGHT 0x8
+#define PS2_SPACE 0x1
 /*-----------------------------类型定义------------------------------------*/
 enum thing
 {
@@ -139,6 +147,8 @@ int nameMap[  ][2]=	{{ 5,4},{ 6,4},{ 7,4},{ 6,5},{ 6,6},{ 6,7},{ 6,8},//T
 };							//显示游戏名
 int squareMap[	][2]={{1,17},{2,16},{3,15},{4,14},{5,13},{6,12},{7,11},{8,10},
 					  {9,9},{10,10},{11,11},{12,12},{13,13},{14,14},{15,15},{16,16},{17,17}};		//生成初始方块
+int square_tu[][2]={{6,17},{7,17},{8,17},{9,17},{10,17},{11,17},{12,17},{9,16},
+					  {9,15},{8,14},{10,14},{9,13},{9,12}};		//生成初始方块
 int X,Y;                 	//生成下落方块的坐标
 int x_next=24,y_next=3;     //后续方块显示位置
 int num=0;                 	//方块索引
@@ -147,7 +157,8 @@ int shapeIndex_next;		//后续方块索引，取值为1-19
 
 int button_status;  //按键状态
 int switch_status;  //开关状态
-int score=59;		//初始得分
+int PS2_status;		//键盘状态
+int score=0;		//初始得分
 int first_num=0;	//得分个位
 int second_num=0;	//得分十位
 
@@ -285,6 +296,8 @@ Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET,Xil_In32(XPAR_AXI_TIMER_0_BA
 //初始化地图界面
 void inimap() {
 /*-----------------------------画地图------------------------------------*/
+	//初始化得分
+	score=0;
 	//画背景
 	for (int i = 1; i < HEIGHT_2-1; i++) {
 			for (int j = 0; j < WIDTH_2-1; j++) {
@@ -373,8 +386,17 @@ void rand_square(int difficult){
 			case 1:
 				break;
 			case 2:
-				for(int i=1;i<6;i++)
+				for(int i=1;i<7;i++)
+					{
 					map[i][8] = difficulty;
+					map[HEIGHT_1-i][12] = difficulty;
+
+					}
+				for (int i=0;i<13;i++){//打印初始方块
+									int m=square_tu[i][0];
+									int n=square_tu[i][1];
+									map[m][n]=difficulty;
+								}
 				break;
 			case 3:
 				for (int i=0;i<17;i++){//打印初始方块
@@ -888,8 +910,12 @@ int main()
     Xil_Out32(XPAR_AXI_GPIO_2_BASEADDR+XGPIO_TRI_OFFSET,0xffff);//输入方向
     Xil_Out32(XPAR_AXI_GPIO_2_BASEADDR+XGPIO_IER_OFFSET,0x1);//使能1号引脚中断
     Xil_Out32(XPAR_AXI_GPIO_2_BASEADDR+XGPIO_GIE_OFFSET,0x80000000);//使能中断输出
+    //PS2
+    //Xil_Out32(XPAR_AXI_GPIO_3_BASEADDR+XGPIO_TRI_OFFSET,0xffff);//输入方向
+    //Xil_Out32(XPAR_AXI_GPIO_3_BASEADDR+XGPIO_IER_OFFSET,0x1);//使能1号引脚中断
+    //Xil_Out32(XPAR_AXI_GPIO_3_BASEADDR+XGPIO_GIE_OFFSET,0x80000000);//使能中断输出
     //INTC
-    Xil_Out32(XPAR_AXI_INTC_0_BASEADDR+XIN_IER_OFFSET,0xb);//使能GPIO和Timer中断
+    Xil_Out32(XPAR_AXI_INTC_0_BASEADDR+XIN_IER_OFFSET,0x3);//使能GPIO和Timer中断
     Xil_Out32(XPAR_AXI_INTC_0_BASEADDR+XIN_MER_OFFSET,0x3);//使能中断输出
 
     Xil_Out32(XPAR_AXI_GPIO_1_BASEADDR+XGPIO_TRI_OFFSET,0x00);
@@ -913,17 +939,16 @@ int main()
 	clearStack(&stack);
 	caculate();
 	game_begin();
-//	inimap();
-//	int i,j=0;
-//    while(1){
-//	  Xil_Out16( XPAR_GPIO_1_BASEADDR+XGPIO_DATA_OFFSET,poscode[pos]);
-//	  Xil_Out16( XPAR_GPIO_1_BASEADDR+XGPIO_DATA2_OFFSET,segcode[pos]);
-//	  for( i=0;i<1000;i++)
-//		  	 j=i;
-//	   pos++;
-//	  if(pos==8)
-//	     pos=0;
-//	}
+	int i,j=0;
+    while(1){
+	  Xil_Out16( XPAR_GPIO_1_BASEADDR+XGPIO_DATA_OFFSET,poscode[pos]);
+	  Xil_Out16( XPAR_GPIO_1_BASEADDR+XGPIO_DATA2_OFFSET,segcode[pos]);
+	  for( i=0;i<1000;i++)
+		  	 j=i;
+	   pos++;
+	  if(pos==8)
+	     pos=0;
+	}
 	return 0;
 }
 /*-----------------------------中断处理------------------------------------*/
@@ -935,6 +960,8 @@ void My_ISR()
 	    TimerCounterHandler();
 	  if ((status & XPAR_AXI_GPIO_0_IP2INTC_IRPT_MASK) == XPAR_AXI_GPIO_0_IP2INTC_IRPT_MASK)
 		  Button_Handler();
+	  //if ((status & XPAR_AXI_GPIO_3_IP2INTC_IRPT_MASK) == XPAR_AXI_GPIO_3_IP2INTC_IRPT_MASK)
+		//  PS2_Handler();
 	  Xil_Out32(XPAR_INTC_0_BASEADDR + XIN_IAR_OFFSET, status);
 }
 
@@ -1048,4 +1075,64 @@ void Button_Handler(){
 		}
 	Xil_Out32(XPAR_GPIO_0_BASEADDR + XGPIO_ISR_OFFSET, XGPIO_IR_MASK);//写IPISR，清除中断
 	Xil_Out32(XPAR_AXI_INTC_0_BASEADDR + XIN_IAR_OFFSET, 0x2);//写INTC_IAR，清除中断状态
+}
+
+void PS2_Handler(){
+	//PS2_status = Xil_In32(XPAR_GPIO_3_BASEADDR + XGPIO_DATA_OFFSET);  //读取按键的状态值
+	if((PS2_status==PS2_SPACE)&&(start)){
+		if (begin == 1)
+			begin=0;
+		else if(begin == 0)
+			begin=1;
+		}
+
+	if((!start)&&(PS2_status==PS2_SPACE))
+	{
+
+		switch_status = Xil_In8(XPAR_GPIO_2_BASEADDR + XGPIO_DATA_OFFSET) & 0x7;
+		if((switch_status==0x1)||(switch_status==0x2)||(switch_status==0x4))
+			{
+			start=1;
+			inimap();
+			}
+	}
+
+	if (begin != 0) {
+	    // 如果 begin 不等于 0，说明需要启动定时器
+	    Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR + XTC_TCSR_OFFSET,
+	              Xil_In32(XPAR_AXI_TIMER_0_BASEADDR + XTC_TCSR_OFFSET) | XTC_CSR_ENABLE_TMR_MASK);
+	    makescore_ing();
+	}
+
+	if(begin==0){
+		// 如果 begin 等于 0，说明需要停止定时器
+		Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET,
+				Xil_In32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TCSR_OFFSET)&~XTC_CSR_ENABLE_TMR_MASK);
+		makescore_stop();//暂停并展示得分
+	}
+	if (PS2_status == PS2_UP&&(begin)&&(start))
+		{
+		chageShape();
+		scan();
+		}
+	if((PS2_status==PS2_DOWN)&&(speed_down<speed_max)&&(begin)&&(start)){//加速下降
+			speed_down++;
+			Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TLR_OFFSET,(RESET_VALUE+2)/speed_down-2);
+		}
+		else if((PS2_status==PS2_DOWN)&&(speed_down==speed_max)&&(begin)&&(start)){
+			speed_down=1;
+			Xil_Out32(XPAR_AXI_TIMER_0_BASEADDR+XTC_TLR_OFFSET,(RESET_VALUE+2)/speed_down-2);
+		}
+	if ((PS2_status == PS2_LEFT)&&(begin)&&(start))
+		{
+		move_left();
+		scan();
+		}
+	if ((PS2_status == PS2_RIGHT)&&(begin)&&(start))
+		{
+		move_right();
+		scan();
+		}
+	//Xil_Out32(XPAR_GPIO_3_BASEADDR + XGPIO_ISR_OFFSET, XGPIO_IR_MASK);//写IPISR，清除中断
+	//Xil_Out32(XPAR_AXI_INTC_0_BASEADDR + XIN_IAR_OFFSET, 0x2);//写INTC_IAR，清除中断状态
 }
